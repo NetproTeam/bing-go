@@ -8,9 +8,13 @@
 
 #define BUF_SIZE 1024
 #define BOARD_SIZE 5
+#define CHECKED -1
+
 void error_handling(char *message);
 void printBingo();
 void createBingoBoard();
+void insertBingo(int xIndex, int yIndex);
+int checkBingo();
 
 int bingoBoard[BOARD_SIZE][BOARD_SIZE];
 
@@ -72,10 +76,14 @@ int main(int argc, char *argv[])
     // close(sock);
     createBingoBoard();
     printBingo();
+    insertBingo(2,3);
+    printBingo();
+    printf("%d\n", checkBingo());
 
     return 0;
 }
 
+//make 5*5 random bingoboard
 void createBingoBoard()
 {
     //check dup
@@ -116,17 +124,94 @@ void createBingoBoard()
     return;
 }
 
+//print bingoboard
 void printBingo()
 {
+    printf("+===============Bingo===============+\n");
+    
     for (int i = 0; i < BOARD_SIZE; i++)
     {
         for (int j = 0; j < BOARD_SIZE; j++)
         {
-            printf("%4d ", bingoBoard[i][j]);
+            if (bingoBoard[i][j] <= 0)
+            {
+                printf("| %4s ", "X");
+            }
+            else
+            {
+                printf("| %4d ", bingoBoard[i][j]);
+            }            
         }   
-        printf("\n");
+        printf("|");
+        printf("\n+===================================+\n");
     }
+    printf("\n");
     return;
+}
+
+int checkBingo() 
+{
+    int i, j;
+    int result = 0;
+    int cnt = 0;
+
+    for(i = 0; i < BOARD_SIZE; i++) {
+        cnt = 0;
+        for(j = 0; j < BOARD_SIZE; j++) {
+            if(bingoBoard[i][j] == CHECKED) {
+                cnt++;
+            }
+        }
+        if(cnt == BOARD_SIZE) {
+            result++;
+        }
+    }
+    for(j = 0; j < BOARD_SIZE; j++) {
+        cnt = 0;
+        for(i = 0; i < BOARD_SIZE; i++) {
+            if(bingoBoard[i][j] == CHECKED) {
+                cnt++;
+            }
+        }
+        if(cnt == BOARD_SIZE) {
+            result++;
+        }
+    }
+
+    cnt = 0;
+    for(i = 0; i < BOARD_SIZE; i++) {
+        if(bingoBoard[i][i] == CHECKED) {
+            cnt++;
+        }
+    }
+    if(cnt == BOARD_SIZE) {
+        result++;
+    }
+
+    cnt = 0;
+    for(i = 0; i < BOARD_SIZE; i++) {
+        if(bingoBoard[i][BOARD_SIZE - i - 1] == CHECKED) {
+            cnt++;
+        }
+    }
+    if(cnt == BOARD_SIZE) {
+        result++;
+    }
+    
+    return result;
+}
+
+//set bingo number to -1
+void insertBingo(int xIndex, int yIndex)
+{
+    //check out of index
+    if (xIndex > BOARD_SIZE || yIndex > BOARD_SIZE)
+    {
+        return;
+    }
+
+    //set to -1
+    bingoBoard[xIndex][yIndex] = CHECKED;
 }
 
 
