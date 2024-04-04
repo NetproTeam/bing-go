@@ -8,9 +8,12 @@
 
 #define BUF_SIZE 1024
 #define BOARD_SIZE 5
+#define CHECKED -1
+
 void error_handling(char *message);
 void printBingo();
 void createBingoBoard();
+int checkBingo();
 
 int bingoBoard[BOARD_SIZE][BOARD_SIZE];
 
@@ -72,7 +75,7 @@ int main(int argc, char *argv[])
     // close(sock);
     createBingoBoard();
     printBingo();
-
+    printf("%d\n", checkBingo());
     return 0;
 }
 
@@ -127,6 +130,57 @@ void printBingo()
         printf("\n");
     }
     return;
+}
+
+int checkBingo() {
+    int i, j;
+    int result = 0;
+    int cnt = 0;
+
+    for(i = 0; i < BOARD_SIZE; i++) {
+        cnt = 0;
+        for(j = 0; j < BOARD_SIZE; j++) {
+            if(bingoBoard[i][j] == CHECKED) {
+                cnt++;
+            }
+        }
+        if(cnt == BOARD_SIZE) {
+            result++;
+        }
+    }
+    for(j = 0; j < BOARD_SIZE; j++) {
+        cnt = 0;
+        for(i = 0; i < BOARD_SIZE; i++) {
+            if(bingoBoard[i][j] == CHECKED) {
+                cnt++;
+            }
+        }
+        if(cnt == BOARD_SIZE) {
+            result++;
+        }
+    }
+
+    cnt = 0;
+    for(i = 0; i < BOARD_SIZE; i++) {
+        if(bingoBoard[i][i] == CHECKED) {
+            cnt++;
+        }
+    }
+    if(cnt == BOARD_SIZE) {
+        result++;
+    }
+
+    cnt = 0;
+    for(i = 0; i < BOARD_SIZE; i++) {
+        if(bingoBoard[i][BOARD_SIZE - i - 1] == CHECKED) {
+            cnt++;
+        }
+    }
+    if(cnt == BOARD_SIZE) {
+        result++;
+    }
+    
+    return result;
 }
 
 
