@@ -79,7 +79,6 @@ int main(int argc, char *argv[])
     insertBingo(2,3);
     printBingo();
     printf("%d\n", checkBingo());
-
     return 0;
 }
 
@@ -213,7 +212,6 @@ void insertBingo(int xIndex, int yIndex)
     //set to -1
     bingoBoard[xIndex][yIndex] = CHECKED;
 }
-
 
 void error_handling(char *message)
 {
