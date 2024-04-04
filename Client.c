@@ -5,6 +5,8 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include <pthread.h>
+#include <ctype.h>
 
 #define BUF_SIZE 1024
 #define BOARD_SIZE 5
@@ -15,12 +17,16 @@ void printBingo();
 void createBingoBoard();
 void insertBingo(int xIndex, int yIndex);
 int checkBingo();
+void* getUserInput(void* arg);
+void* receiveData(void* arg);
 
 int bingoBoard[BOARD_SIZE][BOARD_SIZE];
+int usedNumber[100];
+int usedCnt = 0;
 
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
+    pthread_t snd_thread, rcv_thread;
     int sock;
     //빙고판
     int bingoBoard[25];
@@ -32,24 +38,21 @@ int main(int argc, char *argv[])
     //gcc clint.c -o clint          
     //./client 127.0.0.1 9091 //temp ip address
 
-    // if (argc != 3)
-    // {
+    // if (argc != 3) {
     //     printf("Usage: %s <IP> <PORT>\n", argv[0]);
     // }
 
     // sock = socket(PF_INET, SOCK_STREAM, 0);
-    // if (sock == -1)
-    // {
+    // if (sock == -1) {
     //     error_handling("socket() error");
     // }
  
     // memset(&serv_adr, 0, sizeof(serv_adr));
-    // serv_adr.sin_family = AF_INET; //tcpip
-    // serv_adr.sin_addr.s_addr = inet_addr(argv[1]); //save ip저장
-    // serv_adr.sin_port = htons(atoi(argv[2]));   //port 저장
+    // serv_adr.sin_family = AF_INET; 
+    // serv_adr.sin_addr.s_addr = inet_addr(argv[1]);
+    // serv_adr.sin_port = htons(atoi(argv[2]));
 
-    // if (connect(sock, (struct sockaddr*)&serv_adr, sizeof(serv_adr)) == -1)
-    // {
+    // if (connect(sock, (struct sockaddr*)&serv_adr, sizeof(serv_adr)) == -1) {
     //     error_handling("socket() error");
     //     return 0;
     // }
@@ -74,12 +77,69 @@ int main(int argc, char *argv[])
     // }
     
     // close(sock);
+
+    pthread_create(&snd_thread, NULL, getUserInput, (void*)&sock);
+    pthread_create(&rcv_thread, NULL, receiveData, (void*)&sock);
+
     createBingoBoard();
     printBingo();
     insertBingo(2,3);
     printBingo();
     printf("%d\n", checkBingo());
+    pthread_join(snd_thread, NULL);
     return 0;
+}
+
+
+void* getUserInput(void* arg) {
+    int sock = *((int*) arg);
+    char msg[BUF_SIZE];
+
+    while (1) {
+        int flag = 0;
+        printf("Your turn: ");  
+        fgets(msg, BUF_SIZE, stdin);
+
+        size_t len = strlen(msg);
+        if (len > 0 && msg[len - 1] == '\n') {
+            msg[len - 1] = '\0';
+        }
+
+        int isValidInput = 1;
+        for (int i = 0; msg[i] != '\0'; i++) {
+            if (!isdigit(msg[i])) {
+                isValidInput = 0;
+                break;
+            }
+        }
+        int num = atoi(msg);
+
+        if (!isValidInput || num < 1 || num > 99) {
+            printf("Enter a number between 1 and 99\n");
+            continue;
+        }
+
+        for (int i = 0; i < usedCnt; i++) {
+            if (num == usedNumber[i]) {
+                flag = 1;
+                break;
+            }
+        }
+        if (flag) {
+            printf("Number %d is already entered\n", num);
+        } else {
+            usedNumber[usedCnt++] = num;
+            char numStr[BUF_SIZE];
+            sprintf(numStr, "%d", num);
+            write(sock, numStr, strlen(numStr));
+        }
+    }
+
+    return NULL;
+}
+
+void* receiveData(void* arg) {
+    return NULL;
 }
 
 //make 5*5 random bingoboard
@@ -118,6 +178,10 @@ void createBingoBoard()
         {
             bingoBoard[i][j] = randomNums[index];
             index++;
+
+            if(i == j) {
+                bingoBoard[i][j] = -1;
+            }
         }   
     }
     return;
@@ -196,7 +260,7 @@ int checkBingo()
     if(cnt == BOARD_SIZE) {
         result++;
     }
-    
+
     return result;
 }
 
