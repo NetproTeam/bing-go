@@ -18,9 +18,6 @@ int cur = 0;
 int statuses[2] = {-2,-2};
 int turns[2] = {0,0};
 
-static sem_t sem_one;
-static sem_t sem_two;
-
 void * handle_clnt(void *arg);
 
 void error_handling(char *message);
@@ -33,13 +30,6 @@ int main(int argc,char *argv[]){
 
     if (argc != 2){
         printf("Usage: %s <PORT>\n",argv[0]);
-        exit(1);
-    }
-    int state1 = sem_init(&sem_one,0,0);
-    int state2 = sem_init(&sem_two,0,1);
-
-    if(!state1 || !state2){
-        puts("Semaphore initialization failed");
         exit(1);
     }
 
@@ -78,8 +68,6 @@ int main(int argc,char *argv[]){
         pthread_detach(t_id);
         printf("Connected client IP: %s \n", inet_ntoa(clnt_addr.sin_addr));
     }
-    sem_destroy(&sem_one);
-    sem_destroy(&sem_two);
     printf("Server closed\n");
     close(serv_sock);
     return 0;
@@ -103,6 +91,10 @@ void * handle_clnt(void *arg){
             break;
         }
     }
+    if(statuses[idx] == -1){
+        close(clnt_sock);
+        return NULL;
+    }
     int str_len = 0, i;
     char msg[BUF_SIZE];
 
@@ -111,14 +103,10 @@ void * handle_clnt(void *arg){
         
         if(i > 0){
             if (cur == idx) {
-                sem_wait(&sem_one);
-                sem_post(&sem_two);
                 send_msg(msg, str_len);
                 cur = (cur + 1) % clnt_cnt;
             } else {
                 write(clnt_sock, "상대방의 턴입니다\n", 27);
-                sem_wait(&sem_two);
-                sem_post(&sem_one);
             }
         }
         else if (i < 0) {
@@ -148,6 +136,8 @@ void * handle_clnt(void *arg){
         if(clnt_sock==clnt_socks[i]){
             while(i < clnt_cnt -1){
                 clnt_socks[i] = clnt_socks[i+1];
+                statuses[i] = statuses[i+1];
+                turns[i] = turns[i+1];
                 i += 1;
             }
             break;
@@ -156,12 +146,10 @@ void * handle_clnt(void *arg){
     clnt_cnt -= 1;
     if (clnt_cnt == 1){
         write(clnt_socks[0], "상대방이 나가게 되어 당신이 이겼습니다!\n", 58);
-        close(clnt_socks[0]);
+        statuses[0] = -1;
         return NULL;
     }
     else if (clnt_cnt == 0){
-        sem_destroy(&sem_one);
-        sem_destroy(&sem_two);
         printf("Server closed\n");
         return NULL;
     }
