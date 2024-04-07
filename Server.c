@@ -6,7 +6,6 @@
 #include<arpa/inet.h>
 #include<pthread.h>
 #include<netinet/in.h>
-#include<semaphore.h>
 
 #define BUF_SIZE 100
 #define MAX_CLNT 2
