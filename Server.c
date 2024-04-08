@@ -18,7 +18,9 @@ int cur = 0;
 
 pthread_mutex_t mutx;
 
+// statuses: -2: 빙고 안됨, -1: 빙고 성공, -3: 상대방 나감
 int statuses[2] = {-2,-2};
+
 int turns[2] = {0,0};
 
 void * handle_clnt(void *arg);
@@ -57,16 +59,16 @@ int main(int argc,char *argv[]){
         clnt_addr_sz = sizeof(clnt_addr);
         clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_sz);
         if (clnt_cnt == MAX_CLNT){
-            write(clnt_sock, "Sorry, the room is full. Please press q or Q to out\n", 25);
+            write(clnt_sock, "Sorry, the room is full. Please press q or Q to out\n", 53);
             close(clnt_sock);
             continue;
         }
         clnt_socks[clnt_cnt++] = clnt_sock;
         if (clnt_cnt == 1){
-            write(clnt_sock, "0", 1);
+            write(clnt_sock, "0\n", 3);
         }
         else{
-            write(clnt_sock, "-1", 1);
+            write(clnt_sock, "-1\n", 4);
         }
         pthread_create(&t_id, NULL, handle_clnt, (void*)&clnt_sock);
         pthread_detach(t_id);
@@ -97,16 +99,27 @@ void * handle_clnt(void *arg){
             break;
         }
     }
-    if(statuses[idx] == -1){
-        close(clnt_sock);
-        return NULL;
-    }
     int str_len = 0, i;
     char msg[BUF_SIZE];
 
     while((str_len=read(clnt_sock,msg,sizeof(msg)))!= 0){
         int i = atoi(msg);
+        
         pthread_mutex_lock(&mutx);
+        
+        if(statuses[idx] == -1){
+            close(clnt_sock);
+            pthread_mutex_unlock(&mutx);
+            break;
+        }
+        
+        if(statuses[idx] == -3){
+            write(clnt_sock, "상대방이 나가서 부전승입니다\n", 43);
+            close(clnt_sock);
+            pthread_mutex_unlock(&mutx);
+            break;
+        }
+
         if(i > 0){
             if (cur == idx) {
                 send_msg(msg, str_len);
@@ -122,38 +135,30 @@ void * handle_clnt(void *arg){
                 write(clnt_sock, "당신이 이겼습니다\n", 27);
                 if (statuses[(idx+1)%2] == -2 && turns[idx] == turns[(idx+1)%2]){
                     write(clnt_socks[(idx+1)%2], "당신이 졌습니다\n", 27);
+                    statuses[(idx+1)%2] = -1;
                 }
-                close(clnt_sock);
+                
                 statuses[idx] = -1;
-                return NULL;
+                pthread_mutex_unlock(&mutx);
+                break;
             }
             else{
                 if (statuses[(idx+1)%2] == -1){
                     write(clnt_sock, "당신이 졌습니다\n", 27);
-                    close(clnt_sock);
-                    return NULL;
+                    pthread_mutex_unlock(&mutx);
+                    break;
                 }
             }
         }
         pthread_mutex_unlock(&mutx);
     }
-    // 클라이언트 종료 시에 해당 클라이언트 소켓을 제거
+    
     // 상대방 클라이언트 부전승 메세지 전송
-    for (i=0; i < clnt_cnt; i++){
-        if(clnt_sock==clnt_socks[i]){
-            while(i < clnt_cnt -1){
-                clnt_socks[i] = clnt_socks[i+1];
-                statuses[i] = statuses[i+1];
-                turns[i] = turns[i+1];
-                i += 1;
-            }
-            break;
-        }
-    }
+    int curStatus = statuses[idx];
+    close(clnt_sock);
     clnt_cnt -= 1;
-    if (clnt_cnt == 1){
-        write(clnt_socks[0], "상대방이 나가게 되어 당신이 이겼습니다!\n", 58);
-        statuses[0] = -1;
+    if (clnt_cnt == 1 && curStatus != -1){
+        statuses[(idx+1)%2] = -3;
         return NULL;
     }
     else if (clnt_cnt == 0){
