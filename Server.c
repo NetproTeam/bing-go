@@ -10,9 +10,13 @@
 #define BUF_SIZE 100
 #define MAX_CLNT 2
 
+int serv_sock;
+
 int clnt_cnt = 0;
 int clnt_socks[MAX_CLNT];
 int cur = 0;
+
+pthread_mutex_t mutx;
 
 int statuses[2] = {-2,-2};
 int turns[2] = {0,0};
@@ -22,7 +26,7 @@ void * handle_clnt(void *arg);
 void error_handling(char *message);
 
 int main(int argc,char *argv[]){
-    int serv_sock, clnt_sock;
+    int clnt_sock;
     struct sockaddr_in serv_addr, clnt_addr;
     int clnt_addr_sz;
     pthread_t t_id;
@@ -47,6 +51,7 @@ int main(int argc,char *argv[]){
         error_handling("listen() error");
         exit(1);
     }
+    pthread_mutex_init(&mutx, NULL);
 
     while(1){
         clnt_addr_sz = sizeof(clnt_addr);
@@ -58,15 +63,17 @@ int main(int argc,char *argv[]){
         }
         clnt_socks[clnt_cnt++] = clnt_sock;
         if (clnt_cnt == 1){
-            write(clnt_sock, "당신은 선공입니다\n", 27);
+            write(clnt_sock, "0", 1);
         }
         else{
-            write(clnt_sock, "당신은 후공입니다\n", 27);
+            write(clnt_sock, "-1", 1);
         }
         pthread_create(&t_id, NULL, handle_clnt, (void*)&clnt_sock);
         pthread_detach(t_id);
         printf("Connected client IP: %s \n", inet_ntoa(clnt_addr.sin_addr));
     }
+
+    pthread_mutex_destroy(&mutx);
     printf("Server closed\n");
     close(serv_sock);
     return 0;
@@ -75,9 +82,9 @@ int main(int argc,char *argv[]){
 void send_msg(char *msg,int len){
     int i;
     char temp[BUF_SIZE];
-    sprintf(temp, "turn: %d %s", cur, msg);
+    
     for(i=0; i<clnt_cnt; i++){
-        write(clnt_socks[i], temp, strlen(temp));
+        write(clnt_socks[i], msg, len);
     }
 }
 
@@ -99,7 +106,7 @@ void * handle_clnt(void *arg){
 
     while((str_len=read(clnt_sock,msg,sizeof(msg)))!= 0){
         int i = atoi(msg);
-        
+        pthread_mutex_lock(&mutx);
         if(i > 0){
             if (cur == idx) {
                 send_msg(msg, str_len);
@@ -128,6 +135,7 @@ void * handle_clnt(void *arg){
                 }
             }
         }
+        pthread_mutex_unlock(&mutx);
     }
     // 클라이언트 종료 시에 해당 클라이언트 소켓을 제거
     // 상대방 클라이언트 부전승 메세지 전송
@@ -149,8 +157,10 @@ void * handle_clnt(void *arg){
         return NULL;
     }
     else if (clnt_cnt == 0){
+        pthread_mutex_destroy(&mutx);
         printf("Server closed\n");
-        return NULL;
+        close(serv_sock);
+        exit(0);
     }
 }
 
