@@ -15,7 +15,7 @@
 void error_handling(char *message);
 void printBingo();
 void createBingoBoard();
-void insertBingo(int xIndex, int yIndex);
+void insertBingo(int number);
 int checkBingo();
 void* getUserInput(void* arg);
 void* receiveData(void* arg);
@@ -23,13 +23,12 @@ void* receiveData(void* arg);
 int bingoBoard[BOARD_SIZE][BOARD_SIZE];
 int usedNumber[100];
 int usedCnt = 0;
+int turn;
 
 
 int main(int argc, char *argv[]) {
     pthread_t snd_thread, rcv_thread;
     int sock;
-    //빙고판
-    int bingoBoard[25];
     //입력 숫자
     int input;
     int init = 0;
@@ -38,55 +37,35 @@ int main(int argc, char *argv[]) {
     //gcc clint.c -o clint          
     //./client 127.0.0.1 9091 //temp ip address
 
-    // if (argc != 3) {
-    //     printf("Usage: %s <IP> <PORT>\n", argv[0]);
-    // }
+    if (argc != 3) {
+        printf("Usage: %s <IP> <PORT>\n", argv[0]);
+    }
 
-    // sock = socket(PF_INET, SOCK_STREAM, 0);
-    // if (sock == -1) {
-    //     error_handling("socket() error");
-    // }
+    sock = socket(PF_INET, SOCK_STREAM, 0);
+    if (sock == -1) {
+        error_handling("socket() error");
+    }
  
-    // memset(&serv_adr, 0, sizeof(serv_adr));
-    // serv_adr.sin_family = AF_INET; 
-    // serv_adr.sin_addr.s_addr = inet_addr(argv[1]);
-    // serv_adr.sin_port = htons(atoi(argv[2]));
+    memset(&serv_adr, 0, sizeof(serv_adr));
+    serv_adr.sin_family = AF_INET; 
+    serv_adr.sin_addr.s_addr = inet_addr(argv[1]);
+    serv_adr.sin_port = htons(atoi(argv[2]));
 
-    // if (connect(sock, (struct sockaddr*)&serv_adr, sizeof(serv_adr)) == -1) {
-    //     error_handling("socket() error");
-    //     return 0;
-    // }
-    // else 
-    // {
-    //     puts("Connected--------->");
-    // }
-
-    // while (1)
-    // {
-    //     if (init == 0)
-    //     {
-    //         for (int i = 0; i < 25; i++)
-    //         {
-    //             scanf("%d", &input);
-    //             bingoBoard[i] = input;
-    //         }
-    //         init = 1;
-    //         printBingo(bingoBoard);
-    //     }
-        
-    // }
-    
-    // close(sock);
+    if (connect(sock, (struct sockaddr*)&serv_adr, sizeof(serv_adr)) == -1) {
+        error_handling("socket() error");
+        return 0;
+    }
+    else 
+    {
+        puts("Connected--------->");
+        createBingoBoard();
+        printBingo();
+    }
 
     pthread_create(&snd_thread, NULL, getUserInput, (void*)&sock);
     pthread_create(&rcv_thread, NULL, receiveData, (void*)&sock);
-
-    createBingoBoard();
-    printBingo();
-    insertBingo(2,3);
-    printBingo();
-    printf("%d\n", checkBingo());
-    pthread_join(snd_thread, NULL);
+    
+    close(sock);
     return 0;
 }
 
@@ -96,6 +75,10 @@ void* getUserInput(void* arg) {
     char msg[BUF_SIZE];
 
     while (1) {
+        if (turn != 0) {
+            continue;
+        }
+
         int flag = 0;
         printf("Your turn: ");  
         fgets(msg, BUF_SIZE, stdin);
@@ -138,7 +121,45 @@ void* getUserInput(void* arg) {
     return NULL;
 }
 
-void* receiveData(void* arg) {
+void *receiveData(void *arg) {
+    int sock = *((int *)arg);
+    char msg[BUF_SIZE];
+
+    while (1) {
+        int str_len = read(sock, msg, BUF_SIZE);
+        if (str_len == -1) {
+            error_handling("read() error");
+        }
+
+        msg[str_len] = '\0';
+
+        int isNumber = 1;
+        for (int i = 0; i < str_len; i++) {
+            if (!isdigit(msg[i])) {
+                isNumber = 0;
+                break;
+            }
+        }
+
+        if (isNumber) {
+            int number = atoi(msg);
+            printf("number: %d\n", number);
+            if(number <= 0) {
+                turn = number;
+            } else {
+                insertBingo(number); 
+                printBingo();
+                if (turn == -1) {
+                    turn = 0;
+                } else {
+                    turn = -1;
+                }
+            }
+        } else {
+            printf("%s\n", msg);
+        }
+    }
+
     return NULL;
 }
 
@@ -178,10 +199,6 @@ void createBingoBoard()
         {
             bingoBoard[i][j] = randomNums[index];
             index++;
-
-            if(i == j) {
-                bingoBoard[i][j] = -1;
-            }
         }   
     }
     return;
@@ -264,17 +281,15 @@ int checkBingo()
     return result;
 }
 
-//set bingo number to -1
-void insertBingo(int xIndex, int yIndex)
-{
-    //check out of index
-    if (xIndex > BOARD_SIZE || yIndex > BOARD_SIZE)
-    {
-        return;
+void insertBingo(int number) {
+    for(int i = 0; i < BOARD_SIZE; i++) {
+        for(int j = 0; j < BOARD_SIZE; j++) {
+            if (bingoBoard[i][j] == number) {
+                bingoBoard[i][j] = -1;
+                return;
+            }
+        }
     }
-
-    //set to -1
-    bingoBoard[xIndex][yIndex] = CHECKED;
 }
 
 void error_handling(char *message)
