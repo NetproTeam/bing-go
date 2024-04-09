@@ -64,12 +64,12 @@ int main(int argc,char *argv[]){
             continue;
         }
         clnt_socks[clnt_cnt++] = clnt_sock;
-        if (clnt_cnt == 1){
-            write(clnt_sock, "0\n", 3);
+
+        if (clnt_cnt == 2){
+            write(clnt_socks[0], "0", 1);
+            write(clnt_socks[1], "-1", 2);
         }
-        else{
-            write(clnt_sock, "-1\n", 4);
-        }
+
         pthread_create(&t_id, NULL, handle_clnt, (void*)&clnt_sock);
         pthread_detach(t_id);
         printf("Connected client IP: %s \n", inet_ntoa(clnt_addr.sin_addr));
