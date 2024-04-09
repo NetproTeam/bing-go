@@ -221,7 +221,7 @@ void *receiveData(void *arg) {
                 int check = checkBingo();
                 printBingo();
 
-                if (check == 3) {
+                if (check >= 3) {
                     write(sock, "-1", sizeof("-1"));
                     turn = 99999;
                 } else {
