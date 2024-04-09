@@ -71,13 +71,13 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-
 void* getUserInput(void* arg) {
     int sock = *((int*) arg);
     char msg[BUF_SIZE];
 
     while (1) {
         if (turn != 0) {
+            fflush(stdin);
             continue;
         }
 
@@ -157,13 +157,20 @@ void *receiveData(void *arg) {
 
                 if (number == -2) {
                     printf("당신이 이겼습니다\n");
+                    close(sock);
                     exit(0);
                 } 
                 else if (number == -3) {
                     printf("당신은 졌습니다\n");
+                    close(sock);
                     exit(0);
                 } else if (number == -4) {
                     printf("당신이 이겼습니다\n");
+                    close(sock);
+                    exit(0);
+                } else if (number == -5) {
+                    printf("방이 가득 찼습니다");
+                    close(sock);
                     exit(0);
                 }
             } else {
@@ -173,6 +180,7 @@ void *receiveData(void *arg) {
 
                 if (check == 3) {
                     write(sock, "-1", sizeof("-1"));
+                    turn = 99999;
                 } else {
                     write(sock, "-2", sizeof("-2"));
                 }
@@ -180,10 +188,10 @@ void *receiveData(void *arg) {
                 if (turn == 0) {
                     printf("상대턴입니다\n");
                     turn = -1;
-                    } else {
+                    } else if(turn == -1) {
                         printf("당신턴입니다: "); 
                         fflush(stdout);
-                    turn = 0;
+                        turn = 0;
                 }
             }
         } else {
