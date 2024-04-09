@@ -205,39 +205,33 @@ void *receiveData(void *arg) {
 }
 
 //make 5*5 random bingoboard
-void createBingoBoard()
-{
+void createBingoBoard() {
     //check dup
     int randomNums[25];
     int dup = 0;
 
     srand((unsigned int )time(NULL));
     //create 25 non-dup int
-    for (int i = 0; i < 25;)
-    {
+    for (int i = 0; i < 25;) {
         int num = (rand() % 50) + 1;
-        for (int j = 0; j < 25; j++)
-        {
+        for (int j = 0; j < 25; j++) {
             //check dup
-            if (randomNums[j] == num)
-            {
+            if (randomNums[j] == num) {
                 dup = 1;
                 break;
             }
         }
          //no dup insert
-         if (dup == 0)
-         {
+         if (dup == 0) {
             randomNums[i] = num;
             i++;
          }
          dup = 0;
     }
+    
     int index = 0;
-    for (int i = 0; i < BOARD_SIZE; i++)
-    {
-        for (int j = 0; j < BOARD_SIZE; j++)
-        {
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        for (int j = 0; j < BOARD_SIZE; j++) {
             bingoBoard[i][j] = randomNums[index];
             index++;
         }   
@@ -246,20 +240,15 @@ void createBingoBoard()
 }
 
 //print bingoboard
-void printBingo()
-{
+void printBingo() {
     printf("+===============Bingo===============+\n");
     
-    for (int i = 0; i < BOARD_SIZE; i++)
-    {
-        for (int j = 0; j < BOARD_SIZE; j++)
-        {
-            if (bingoBoard[i][j] <= 0)
-            {
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        for (int j = 0; j < BOARD_SIZE; j++) {
+            if (bingoBoard[i][j] <= 0) {
                 printf("| %4s ", "X");
             }
-            else
-            {
+            else {
                 printf("| %4d ", bingoBoard[i][j]);
             }            
         }   
@@ -270,8 +259,7 @@ void printBingo()
     return;
 }
 
-int checkBingo() 
-{
+int checkBingo() {
     int i, j;
     int result = 0;
     int cnt = 0;
@@ -333,8 +321,7 @@ void insertBingo(int number) {
     }
 }
 
-void error_handling(char *message)
-{
+void error_handling(char *message) {
     fputs(message, stderr);
     fputc('\n', stderr);
     exit(1);
