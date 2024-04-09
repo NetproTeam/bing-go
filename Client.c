@@ -81,8 +81,7 @@ void* getUserInput(void* arg) {
             continue;
         }
 
-        int flag = 0;
-        printf("Your turn: ");  
+        int flag = 0; 
         fgets(msg, BUF_SIZE, stdin);
 
         size_t len = strlen(msg);
@@ -105,14 +104,14 @@ void* getUserInput(void* arg) {
         }
 
         for (int i = 0; i < usedCnt; i++) {
-            if (num == usedNumber[i]) {
+            if (num == usedNumber[i] && turn == 0) {
                 flag = 1;
                 break;
             }
         }
         if (flag) {
             printf("Number %d is already entered\n", num);
-        } else {
+        } else if (turn == 0) {
             usedNumber[usedCnt++] = num;
             char numStr[BUF_SIZE];
             sprintf(numStr, "%d", num);
@@ -134,10 +133,10 @@ void *receiveData(void *arg) {
         }
 
         msg[str_len] = '\0';
-
+   
         int isNumber = 1;
-        for (int i = 0; i < str_len; i++) {
-            if (!isdigit(msg[i])) {
+        for (int i = 0; msg[i] < str_len; i++) {
+            if (!isdigit(msg[i]) && (msg[i] != '-' || i != 0) && (msg[i] != '0' || i != 0)) {
                 isNumber = 0;
                 break;
             }
@@ -145,9 +144,12 @@ void *receiveData(void *arg) {
 
         if (isNumber) {
             int number = atoi(msg);
-            printf("number: %d\n", number);
+
             if(number <= 0) {
                 turn = number;
+                if (turn == 0) {
+                    printf("Your turn: "); 
+                }
             } else {
                 insertBingo(number); 
                 int check = checkBingo();
@@ -156,10 +158,11 @@ void *receiveData(void *arg) {
                 if (check == 3) {
                     write(sock, "3", sizeof("3"));
                 }
-                if (turn == -1) {
-                    turn = 0;
-                } else {
+                if (turn == 0) {
                     turn = -1;
+                } else {
+                    printf("Your turn: "); 
+                    turn = 0;
                 }
             }
         } else {
