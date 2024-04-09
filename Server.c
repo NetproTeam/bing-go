@@ -6,6 +6,7 @@
 #include<arpa/inet.h>
 #include<pthread.h>
 #include<netinet/in.h>
+#include<stdbool.h>
 
 #define BUF_SIZE 100
 #define MAX_CLNT 2
@@ -16,12 +17,16 @@ int clnt_cnt = 0;
 int clnt_socks[MAX_CLNT];
 int cur = 0;
 
+volatile bool is_locked = false;
 pthread_mutex_t mutx;
 
 // statuses: -2: 빙고 안됨, -1: 빙고 성공, -3: 상대방 나감
 int statuses[2] = {-2,-2};
 
 int turns[2] = {0,0};
+
+void lock_mutex();
+void unlock_mutex();
 
 void * handle_clnt(void *arg);
 
@@ -47,11 +52,9 @@ int main(int argc,char *argv[]){
 
     if(bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1){
         error_handling("bind() error");
-        exit(1);
     }
     if(listen(serv_sock, 5) == -1){
         error_handling("listen() error");
-        exit(1);
     }
     pthread_mutex_init(&mutx, NULL);
 
@@ -92,6 +95,8 @@ void send_msg(char *msg,int len){
 
 void * handle_clnt(void *arg){
     int clnt_sock = *((int*) arg);
+
+	// find cur idx
     int idx = 0;
     for (int i = 0; i < clnt_cnt; i++){
         if(clnt_sock == clnt_socks[i]){
@@ -99,24 +104,22 @@ void * handle_clnt(void *arg){
             break;
         }
     }
-    int str_len = 0, i;
-    char msg[BUF_SIZE];
 
+    int str_len = 0;
+    char msg[BUF_SIZE];
     while((str_len=read(clnt_sock,msg,sizeof(msg)))!= 0){
         int i = atoi(msg);
         
-        pthread_mutex_lock(&mutx);
-        
+        lock_mutex();
         if(statuses[idx] == -1){
             close(clnt_sock);
-            pthread_mutex_unlock(&mutx);
             break;
         }
+
         // 부전승 시에 클라이언트에 -4 보냄
         if(statuses[idx] == -3){
             write(clnt_sock, "-4", 3);
             close(clnt_sock);
-            pthread_mutex_unlock(&mutx);
             break;
         }
 
@@ -140,19 +143,18 @@ void * handle_clnt(void *arg){
                 }
                 
                 statuses[idx] = -1;
-                pthread_mutex_unlock(&mutx);
                 break;
             }
             else{
                 if (statuses[(idx+1)%2] == -1){
                     write(clnt_sock, "-3", 3);
-                    pthread_mutex_unlock(&mutx);
                     break;
                 }
             }
         }
-        pthread_mutex_unlock(&mutx);
+        unlock_mutex();
     }
+    unlock_mutex();
     
     // 상대방 클라이언트 부전승 메세지 전송
     int curStatus = statuses[idx];
@@ -167,6 +169,17 @@ void * handle_clnt(void *arg){
         printf("Server closed\n");
         close(serv_sock);
         exit(0);
+    }
+}
+
+void lock_mutex() {
+    pthread_mutex_lock(&mutx);
+    is_locked = true;
+}
+
+void unlock_mutex() {
+    if (__sync_bool_compare_and_swap(&is_locked, true, false)) {
+        pthread_mutex_unlock(&mutx);
     }
 }
 
