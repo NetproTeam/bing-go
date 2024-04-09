@@ -11,6 +11,17 @@
 #define BUF_SIZE 100
 #define MAX_CLNT 2
 
+// statuses: -2: 빙고 안됨, -1: 빙고 성공, -3: 상대방 나감, -4: 게임 종료
+#define NO_BINGO_STATUS -2
+#define BINGO_STATUS -1
+#define OPPONENT_EXIT_STATUS -3
+#define GAME_OVER_STATUS -4
+
+// signals => 빙고 안됨: 0, 승리: -2, 패배: -3, 무승부: -4
+#define WIN_SIGNAL -2
+#define LOSE_SIGNAL -3
+#define DRAW_SIGNAL -4
+
 int serv_sock;
 
 int clnt_cnt = 0;
@@ -20,20 +31,23 @@ int cur = 0;
 volatile bool is_locked = false;
 pthread_mutex_t mutx;
 
-// statuses: -2: 빙고 안됨, -1: 빙고 성공, -3: 상대방 나감
-int statuses[2] = {-2,-2};
+int statuses[2] = { NO_BINGO_STATUS, NO_BINGO_STATUS };
 
-int turns[2] = {0,0};
-
-void clean_up();
+int turns[2] = { 0, 0 };
 
 void open_server_socket(char *port);
 int connect_client();
+void send_num(int clnt_sock, int num);
+void send_msg_to_all_clnt(char *msg,int len);
 
 void lock_mutex();
 void unlock_mutex();
+void clean_up();
 
-void * handle_clnt(void *arg);
+void *handle_clnt(void *arg);
+int check_winner_and_send_signal(int idx);
+int get_idx_by_sock(int clnt_sock);
+int get_opponent(int idx);
 
 void error_handling(char *message);
 
@@ -56,8 +70,8 @@ int main(int argc,char *argv[]){
         }
 
         if (clnt_cnt == 2){
-            write(clnt_socks[0], "0", 2);
-            write(clnt_socks[1], "-1", 3);
+            send_num(clnt_socks[0], 0);
+            send_num(clnt_socks[1], -1);
         }
 
         pthread_create(&t_id, NULL, handle_clnt, (void*)&clnt_sock);
@@ -69,91 +83,90 @@ int main(int argc,char *argv[]){
     return 0;
 }   
 
-void send_msg(char *msg,int len){
-    int i;
-    char temp[BUF_SIZE];
-    
-    for(i=0; i<clnt_cnt; i++){
-        write(clnt_socks[i], msg, len);
-    }
-}
-
 void * handle_clnt(void *arg){
     int clnt_sock = *((int*) arg);
-
-	// find cur idx
-    int idx = 0;
-    for (int i = 0; i < clnt_cnt; i++){
-        if(clnt_sock == clnt_socks[i]){
-            idx = i;
-            break;
-        }
-    }
+    int idx = get_idx_by_sock(clnt_sock);
+    int opponent_idx = get_opponent(idx);
 
     int str_len = 0;
     char msg[BUF_SIZE];
-    while((str_len=read(clnt_sock,msg,sizeof(msg)))!= 0){
+    while((str_len = read(clnt_sock, msg, sizeof(msg))) !=  0){
         int i = atoi(msg);
         
         lock_mutex();
-        if(statuses[idx] == -1){
-            close(clnt_sock);
+        if(statuses[idx] == GAME_OVER_STATUS) {
+            break;
+        } else if(statuses[idx] == OPPONENT_EXIT_STATUS) {
+            send_num(clnt_sock, WIN_SIGNAL);
             break;
         }
 
-        // 부전승 시에 클라이언트에 -4 보냄
-        if(statuses[idx] == -3){
-            write(clnt_sock, "-4", 3);
-            close(clnt_sock);
-            break;
-        }
-
-        if(i > 0){
+        if (i > 0) {
             if (cur == idx) {
-                send_msg(msg, str_len);
+                send_msg_to_all_clnt(msg, str_len);
                 cur = (cur + 1) % clnt_cnt;
             } else {
                 write(clnt_sock, "상대방의 턴입니다\n", 27);
             }
-        }
-        else if (i < 0) {
-            // 빙고 완성 시에 결과 각 클라이언트에게 전송
-            // 승리 시 -2, 패배 시 -3
+        } else if (i < 0) {
             turns[idx] += 1;
-            if(i == -1){
-                write(clnt_sock, "-2", 3);
-                if (statuses[(idx+1)%2] == -2 && turns[idx] == turns[(idx+1)%2]){
-                    write(clnt_socks[(idx+1)%2], "-3", 3);
-                    statuses[(idx+1)%2] = -1;
-                }
-                
-                statuses[idx] = -1;
-                break;
+            if (i == -1) {
+                statuses[idx] = BINGO_STATUS;
             }
-            else{
-                if (statuses[(idx+1)%2] == -1){
-                    write(clnt_sock, "-3", 3);
-                    break;
-                }
+
+            if (turns[idx] == turns[opponent_idx] && check_winner_and_send_signal(idx) != 0) {
+                statuses[idx] = GAME_OVER_STATUS;
+                statuses[opponent_idx] = GAME_OVER_STATUS;
+                break;
             }
         }
         unlock_mutex();
     }
     unlock_mutex();
     
-    // 상대방 클라이언트 부전승 메세지 전송
-    int curStatus = statuses[idx];
     close(clnt_sock);
     clnt_cnt -= 1;
-    if (clnt_cnt == 1 && curStatus != -1){
-        statuses[(idx+1)%2] = -3;
-        return NULL;
-    }
-    else if (clnt_cnt == 0){
+    if (clnt_cnt == 0) {
         clean_up();
         printf("Server closed\n");
         exit(0);
+    } else if (statuses[idx] != BINGO_STATUS){
+        statuses[opponent_idx] = OPPONENT_EXIT_STATUS;
     }
+    return NULL;
+}
+
+int check_winner_and_send_signal(int idx) {
+    int opponent_idx = get_opponent(idx);
+    if (statuses[idx] != BINGO_STATUS && statuses[opponent_idx] != BINGO_STATUS) {
+        return 0;
+    }
+
+    if (statuses[idx] == BINGO_STATUS && statuses[opponent_idx] == BINGO_STATUS) {
+        send_num(clnt_socks[idx], DRAW_SIGNAL);
+        send_num(clnt_socks[opponent_idx], DRAW_SIGNAL);
+    } else if (statuses[idx] == BINGO_STATUS) {
+        send_num(clnt_socks[idx], WIN_SIGNAL);
+        send_num(clnt_socks[opponent_idx], LOSE_SIGNAL);
+    } else if (statuses[opponent_idx] == BINGO_STATUS) {
+        send_num(clnt_socks[idx], LOSE_SIGNAL);
+        send_num(clnt_socks[opponent_idx], WIN_SIGNAL);
+    }
+    return 1;
+}
+
+int get_idx_by_sock(int clnt_sock){
+    for (int i = 0; i < clnt_cnt; i++){
+        if(clnt_sock == clnt_socks[i]){
+            return i;
+        }
+    }
+    return -1;
+}
+
+int get_opponent(int idx) {
+    if (idx < 0) return -1;
+    return (idx + 1) % 2;
 }
 
 void open_server_socket(char *port){
@@ -173,7 +186,7 @@ void open_server_socket(char *port){
     }
 }
 
-int connect_client(){
+int connect_client() {
     struct sockaddr_in clnt_addr;
     int clnt_addr_sz = sizeof(clnt_addr);
     int clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_sz);
@@ -183,7 +196,7 @@ int connect_client(){
     }
 
     if (clnt_cnt == MAX_CLNT){
-        write(clnt_sock, "-5", 3);
+        send_num(clnt_sock, -5);
         close(clnt_sock);
         return -1;
     }
@@ -195,11 +208,18 @@ int connect_client(){
     return clnt_sock;
 }
 
-void clean_up() {
-    pthread_mutex_destroy(&mutx);
-    close(serv_sock);
-    for (int i = 0; i < MAX_CLNT; i++) {
-        close(clnt_socks[i]);
+void send_num(int clnt_sock, int num) {
+    char msg[100];
+    sprintf(msg, "%d", num);
+    write(clnt_sock, msg, strlen(msg));
+}
+
+void send_msg_to_all_clnt(char *msg,int len) {
+    int i;
+    char temp[BUF_SIZE];
+    
+    for(i=0; i<clnt_cnt; i++){
+        write(clnt_socks[i], msg, len);
     }
 }
 
@@ -212,6 +232,14 @@ void unlock_mutex() {
     if (__sync_bool_compare_and_swap(&is_locked, true, false)) {
         pthread_mutex_unlock(&mutx);
     }
+}
+
+void clean_up() {
+    for (int i = 0; i < MAX_CLNT; i++) {
+        close(clnt_socks[i]);
+    }
+    close(serv_sock);
+    pthread_mutex_destroy(&mutx);
 }
 
 //message를 stderr 형태로 나타냄
