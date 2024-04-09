@@ -59,7 +59,7 @@ int main(int argc,char *argv[]){
         clnt_addr_sz = sizeof(clnt_addr);
         clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_sz);
         if (clnt_cnt == MAX_CLNT){
-            write(clnt_sock, "Sorry, the room is full. Please press q or Q to out\n", 53);
+            write(clnt_sock, "-5", 3);
             close(clnt_sock);
             continue;
         }
