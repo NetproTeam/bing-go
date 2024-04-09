@@ -76,13 +76,12 @@ void* getUserInput(void* arg) {
     char msg[BUF_SIZE];
 
     while (1) {
-        if (turn != 0) {
-            fflush(stdin);
-            continue;
-        }
-
         int flag = 0; 
         fgets(msg, BUF_SIZE, stdin);
+
+        if (turn != 0) {
+            continue;
+        }
 
         size_t len = strlen(msg);
         if (len > 0 && msg[len - 1] == '\n') {
@@ -98,8 +97,8 @@ void* getUserInput(void* arg) {
         }
         int num = atoi(msg);
 
-        if (!isValidInput || num < 1 || num > 99) {
-            printf("Enter a number between 1 and 99\n");
+        if (!isValidInput || num < 1 || num > 50) {
+            printf("1에서 50 사이의 숫자 입력해주세요\n");
             continue;
         }
 
@@ -110,12 +109,15 @@ void* getUserInput(void* arg) {
             }
         }
         if (flag) {
-            printf("Number %d is already entered\n", num);
+            printf("%d은 이미 입력하셨습니다\n", num);
         } else if (turn == 0) {
             usedNumber[usedCnt++] = num;
             char numStr[BUF_SIZE];
             sprintf(numStr, "%d", num);
             write(sock, numStr, strlen(numStr));
+        } else {
+            printf("상대턴입니다\n");
+            fflush(stdin);
         }
     }
 
@@ -188,11 +190,11 @@ void *receiveData(void *arg) {
                 if (turn == 0) {
                     printf("상대턴입니다\n");
                     turn = -1;
-                    } else if(turn == -1) {
-                        printf("당신턴입니다: "); 
-                        fflush(stdout);
-                        turn = 0;
-                }
+                } else if(turn == -1) {
+                    printf("당신턴입니다: "); 
+                    fflush(stdout);
+                    turn = 0;
+                }    
             }
         } else {
             printf("%s\n", msg);
