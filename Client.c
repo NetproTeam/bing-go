@@ -23,7 +23,7 @@ void* receiveData(void* arg);
 int bingoBoard[BOARD_SIZE][BOARD_SIZE];
 int usedNumber[100];
 int usedCnt = 0;
-int turn;
+int turn = 999999;
 
 
 int main(int argc, char *argv[]) {
@@ -148,7 +148,23 @@ void *receiveData(void *arg) {
             if(number <= 0) {
                 turn = number;
                 if (turn == 0) {
-                    printf("Your turn: "); 
+                    printf("선공입니다\n"); 
+                    printf("당신턴입니다: "); 
+                    fflush(stdout);
+                } else if (turn == -1){
+                    printf("후공입니다\n");
+                }
+
+                if (number == -2) {
+                    printf("당신이 이겼습니다\n");
+                    exit(0);
+                } 
+                else if (number == -3) {
+                    printf("당신은 졌습니다\n");
+                    exit(0);
+                } else if (number == -4) {
+                    printf("당신이 이겼습니다\n");
+                    exit(0);
                 }
             } else {
                 insertBingo(number); 
@@ -156,12 +172,17 @@ void *receiveData(void *arg) {
                 printBingo();
 
                 if (check == 3) {
-                    write(sock, "3", sizeof("3"));
-                }
-                if (turn == 0) {
-                    turn = -1;
+                    write(sock, "-1", sizeof("-1"));
                 } else {
-                    printf("Your turn: "); 
+                    write(sock, "-2", sizeof("-2"));
+                }
+
+                if (turn == 0) {
+                    printf("상대턴입니다\n");
+                    turn = -1;
+                    } else {
+                        printf("당신턴입니다: "); 
+                        fflush(stdout);
                     turn = 0;
                 }
             }
