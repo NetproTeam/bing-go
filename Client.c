@@ -64,6 +64,8 @@ int main(int argc, char *argv[]) {
 
     pthread_create(&snd_thread, NULL, getUserInput, (void*)&sock);
     pthread_create(&rcv_thread, NULL, receiveData, (void*)&sock);
+
+    pthread_join(rcv_thread, NULL);
     
     close(sock);
     return 0;
@@ -148,7 +150,12 @@ void *receiveData(void *arg) {
                 turn = number;
             } else {
                 insertBingo(number); 
+                int check = checkBingo();
                 printBingo();
+
+                if (check == 3) {
+                    write(sock, "3", sizeof("3"));
+                }
                 if (turn == -1) {
                     turn = 0;
                 } else {
