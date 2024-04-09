@@ -25,6 +25,11 @@ int statuses[2] = {-2,-2};
 
 int turns[2] = {0,0};
 
+void clean_up();
+
+void open_server_socket(char *port);
+int connect_client();
+
 void lock_mutex();
 void unlock_mutex();
 
@@ -34,39 +39,21 @@ void error_handling(char *message);
 
 int main(int argc,char *argv[]){
     int clnt_sock;
-    struct sockaddr_in serv_addr, clnt_addr;
-    int clnt_addr_sz;
     pthread_t t_id;
 
+    pthread_mutex_init(&mutx, NULL);
+
     if (argc != 2){
+        clean_up();
         printf("Usage: %s <PORT>\n",argv[0]);
         exit(1);
     }
-
-    serv_sock = socket(PF_INET, SOCK_STREAM, 0);
-
-    memset(&serv_addr,0,sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_addr.sin_port = htons(atoi(argv[1]));
-
-    if(bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1){
-        error_handling("bind() error");
-    }
-    if(listen(serv_sock, 5) == -1){
-        error_handling("listen() error");
-    }
-    pthread_mutex_init(&mutx, NULL);
+    open_server_socket(argv[1]);
 
     while(1){
-        clnt_addr_sz = sizeof(clnt_addr);
-        clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_sz);
-        if (clnt_cnt == MAX_CLNT){
-            write(clnt_sock, "-5", 3);
-            close(clnt_sock);
+        if ((clnt_sock = connect_client()) == -1) {
             continue;
         }
-        clnt_socks[clnt_cnt++] = clnt_sock;
 
         if (clnt_cnt == 2){
             write(clnt_socks[0], "0", 2);
@@ -75,12 +62,10 @@ int main(int argc,char *argv[]){
 
         pthread_create(&t_id, NULL, handle_clnt, (void*)&clnt_sock);
         pthread_detach(t_id);
-        printf("Connected client IP: %s \n", inet_ntoa(clnt_addr.sin_addr));
     }
 
-    pthread_mutex_destroy(&mutx);
+    clean_up();
     printf("Server closed\n");
-    close(serv_sock);
     return 0;
 }   
 
@@ -165,10 +150,56 @@ void * handle_clnt(void *arg){
         return NULL;
     }
     else if (clnt_cnt == 0){
-        pthread_mutex_destroy(&mutx);
+        clean_up();
         printf("Server closed\n");
-        close(serv_sock);
         exit(0);
+    }
+}
+
+void open_server_socket(char *port){
+    serv_sock = socket(PF_INET, SOCK_STREAM, 0);
+
+    struct sockaddr_in serv_addr;
+    memset(&serv_addr,0,sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serv_addr.sin_port = htons(atoi(port));
+
+    if(bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1){
+        error_handling("bind() error");
+    }
+    if(listen(serv_sock, 5) == -1){
+        error_handling("listen() error");
+    }
+}
+
+int connect_client(){
+    struct sockaddr_in clnt_addr;
+    int clnt_addr_sz = sizeof(clnt_addr);
+    int clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_sz);
+
+    if(clnt_sock == -1) {
+        return -1;
+    }
+
+    if (clnt_cnt == MAX_CLNT){
+        write(clnt_sock, "-5", 3);
+        close(clnt_sock);
+        return -1;
+    }
+    
+    clnt_socks[clnt_cnt] = clnt_sock;
+    clnt_cnt += 1;
+    
+    printf("Connected client IP: %s \n", inet_ntoa(clnt_addr.sin_addr));
+    return clnt_sock;
+}
+
+void clean_up() {
+    pthread_mutex_destroy(&mutx);
+    close(serv_sock);
+    for (int i = 0; i < MAX_CLNT; i++) {
+        close(clnt_socks[i]);
     }
 }
 
