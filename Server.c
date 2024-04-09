@@ -66,8 +66,8 @@ int main(int argc,char *argv[]){
         clnt_socks[clnt_cnt++] = clnt_sock;
 
         if (clnt_cnt == 2){
-            write(clnt_socks[0], "0", 1);
-            write(clnt_socks[1], "-1", 2);
+            write(clnt_socks[0], "0", 2);
+            write(clnt_socks[1], "-1", 3);
         }
 
         pthread_create(&t_id, NULL, handle_clnt, (void*)&clnt_sock);
@@ -112,9 +112,9 @@ void * handle_clnt(void *arg){
             pthread_mutex_unlock(&mutx);
             break;
         }
-        
+        // 부전승 시에 클라이언트에 -4 보냄
         if(statuses[idx] == -3){
-            write(clnt_sock, "상대방이 나가서 부전승입니다\n", 43);
+            write(clnt_sock, "-4", 3);
             close(clnt_sock);
             pthread_mutex_unlock(&mutx);
             break;
@@ -130,11 +130,12 @@ void * handle_clnt(void *arg){
         }
         else if (i < 0) {
             // 빙고 완성 시에 결과 각 클라이언트에게 전송
+            // 승리 시 -2, 패배 시 -3
             turns[idx] += 1;
             if(i == -1){
-                write(clnt_sock, "당신이 이겼습니다\n", 27);
+                write(clnt_sock, "-2", 3);
                 if (statuses[(idx+1)%2] == -2 && turns[idx] == turns[(idx+1)%2]){
-                    write(clnt_socks[(idx+1)%2], "당신이 졌습니다\n", 27);
+                    write(clnt_socks[(idx+1)%2], "-3", 3);
                     statuses[(idx+1)%2] = -1;
                 }
                 
@@ -144,7 +145,7 @@ void * handle_clnt(void *arg){
             }
             else{
                 if (statuses[(idx+1)%2] == -1){
-                    write(clnt_sock, "당신이 졌습니다\n", 27);
+                    write(clnt_sock, "-3", 3);
                     pthread_mutex_unlock(&mutx);
                     break;
                 }
