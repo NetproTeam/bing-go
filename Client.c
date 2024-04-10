@@ -11,7 +11,6 @@
 #define BUF_SIZE 1024
 #define BOARD_SIZE 5
 #define CHECKED -1
-#define HEARTBEAT_INTERVAL 5
 
 void error_handling(char *message);
 void printBingo();
@@ -26,11 +25,6 @@ int bingoBoard[BOARD_SIZE][BOARD_SIZE];
 int usedNumber[100];
 int usedCnt = 0;
 int turn = 999999;
-int server_alive = 0;
-
-void sigalarm_handler(int signal) {
-    server_alive = 0;
-}
 
 int main(int argc, char *argv[]) {
     pthread_t snd_thread, rcv_thread;
@@ -40,9 +34,6 @@ int main(int argc, char *argv[]) {
     int init = 0;
     struct sockaddr_in serv_adr;
     char msg[BUF_SIZE];
-
-    //gcc clint.c -o clint          
-    //./client 127.0.0.1 9091 //temp ip address
 
     if (argc != 3) {
         printf("Usage: %s <IP> <PORT>\n", argv[0]);
@@ -73,10 +64,6 @@ int main(int argc, char *argv[]) {
     pthread_create(&rcv_thread, NULL, receiveData, (void*)&sock);
 
     pthread_join(rcv_thread, NULL);
-
-    signal(SIGALRM, sigalarm_handler);
-
-    alarm(HEARTBEAT_INTERVAL);
     
     close(sock);
     return 0;
@@ -221,8 +208,7 @@ void *receiveData(void *arg) {
 }
 
 //make 5*5 manual bingo board to draw test
-void createManualBingoBoard()
-{
+void createManualBingoBoard() {
     //check dup
     int randomNums[25];
     int dup = 0;
@@ -242,8 +228,7 @@ void createManualBingoBoard()
 }
 
 //make 5*5 random bingoboard
-void createBingoBoard()
-{
+void createBingoBoard() {
     //check dup
     int randomNums[25];
     int dup = 0;
