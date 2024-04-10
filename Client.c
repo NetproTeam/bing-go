@@ -15,6 +15,7 @@
 
 void error_handling(char *message);
 void printBingo();
+void createManualBingoBoard();
 void createBingoBoard();
 void insertBingo(int number);
 int checkBingo();
@@ -51,7 +52,7 @@ int main(int argc, char *argv[]) {
     if (sock == -1) {
         error_handling("socket() error");
     }
- 
+
     memset(&serv_adr, 0, sizeof(serv_adr));
     serv_adr.sin_family = AF_INET; 
     serv_adr.sin_addr.s_addr = inet_addr(argv[1]);
@@ -149,7 +150,7 @@ void *receiveData(void *arg) {
 
         msg[str_len] = '\0';
 
-   
+
         int isNumber = 1;
         for (int i = 0; msg[i] < str_len; i++) {
             if (!isdigit(msg[i]) && (msg[i] != '-' || i != 0) && (msg[i] != '0' || i != 0)) {
@@ -219,8 +220,30 @@ void *receiveData(void *arg) {
     return NULL;
 }
 
+//make 5*5 manual bingo board to draw test
+void createManualBingoBoard()
+{
+    //check dup
+    int randomNums[25];
+    int dup = 0;
+
+    //create 25 non-dup int
+    for (int i = 0; i < 25; i++) {
+        randomNums[i] = i + 1;
+    }
+    int index = 0;
+    for (int i = 0; i < BOARD_SIZE; i++) {
+        for (int j = 0; j < BOARD_SIZE; j++) {
+            bingoBoard[i][j] = randomNums[index];
+            index++;
+        }   
+    }
+    return;
+}
+
 //make 5*5 random bingoboard
-void createBingoBoard() {
+void createBingoBoard()
+{
     //check dup
     int randomNums[25];
     int dup = 0;
@@ -237,11 +260,11 @@ void createBingoBoard() {
             }
         }
          //no dup insert
-         if (dup == 0) {
+        if (dup == 0) {
             randomNums[i] = num;
             i++;
-         }
-         dup = 0;
+        }
+        dup = 0;
     }
     
     int index = 0;
