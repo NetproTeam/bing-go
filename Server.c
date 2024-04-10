@@ -44,6 +44,7 @@ void lock_mutex();
 void unlock_mutex();
 void clean_up();
 
+void *handle_interrupt(void *arg);
 void *handle_clnt(void *arg);
 int check_winner_and_send_signal(int idx);
 int get_idx_by_sock(int clnt_sock);
@@ -64,6 +65,10 @@ int main(int argc,char *argv[]){
     }
     open_server_socket(argv[1]);
 
+    pthread_t interrupt_thread;
+    pthread_create(&interrupt_thread, NULL, handle_interrupt, NULL);
+    pthread_detach(interrupt_thread);
+
     while(1){
         if ((clnt_sock = connect_client()) == -1) {
             continue;
@@ -81,7 +86,17 @@ int main(int argc,char *argv[]){
     clean_up();
     printf("Server closed\n");
     return 0;
-}   
+}
+
+void *handle_interrupt(void *arg) {
+    while (1) {
+        if (statuses[0] == OPPONENT_EXIT_STATUS || statuses[1] == OPPONENT_EXIT_STATUS) {
+            send_num(clnt_socks[0], WIN_SIGNAL);
+            send_num(clnt_socks[1], WIN_SIGNAL);
+            return NULL;
+        }
+    }
+}
 
 void * handle_clnt(void *arg){
     int clnt_sock = *((int*) arg);
@@ -95,9 +110,6 @@ void * handle_clnt(void *arg){
         
         lock_mutex();
         if(statuses[idx] == GAME_OVER_STATUS) {
-            break;
-        } else if(statuses[idx] == OPPONENT_EXIT_STATUS) {
-            send_num(clnt_sock, WIN_SIGNAL);
             break;
         }
 
