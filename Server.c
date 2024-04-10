@@ -243,7 +243,7 @@ void clean_up() {
 }
 
 //message를 stderr 형태로 나타냄
-void error_handling(char *message){
+void error_handling(char *message) {
     fputs(message, stderr);
     fputc('\n',stderr);
     exit(1);

@@ -7,10 +7,12 @@
 #include <time.h>
 #include <pthread.h>
 #include <ctype.h>
+#include <errno.h>
 
 #define BUF_SIZE 1024
 #define BOARD_SIZE 5
 #define CHECKED -1
+#define HEARTBEAT_INTERVAL 5
 
 void error_handling(char *message);
 void printBingo();
@@ -24,7 +26,11 @@ int bingoBoard[BOARD_SIZE][BOARD_SIZE];
 int usedNumber[100];
 int usedCnt = 0;
 int turn = 999999;
+int server_alive = 0;
 
+void sigalarm_handler(int signal) {
+    server_alive = 0;
+}
 
 int main(int argc, char *argv[]) {
     pthread_t snd_thread, rcv_thread;
@@ -33,6 +39,7 @@ int main(int argc, char *argv[]) {
     int input;
     int init = 0;
     struct sockaddr_in serv_adr;
+    char msg[BUF_SIZE];
 
     //gcc clint.c -o clint          
     //./client 127.0.0.1 9091 //temp ip address
@@ -66,6 +73,36 @@ int main(int argc, char *argv[]) {
     pthread_create(&rcv_thread, NULL, receiveData, (void*)&sock);
 
     pthread_join(rcv_thread, NULL);
+
+    signal(SIGALRM, sigalarm_handler);
+
+    alarm(HEARTBEAT_INTERVAL);
+
+    while (1) {
+        printf("enter\n");
+        if (!server_alive) {
+            printf("Server is not responding. Exiting...\n");
+            break;
+        }
+
+        ssize_t recv_size = recv(sock, msg, sizeof(msg), MSG_DONTWAIT);
+
+        if (recv_size == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            } else {
+                error_handling("recv() error");
+            }
+        } else if (recv_size == 0) {
+            printf("서버 오류. 끝내기...\n");
+            break;
+        } else {
+            alarm(HEARTBEAT_INTERVAL);
+            server_alive = 1;
+        }
+
+        sleep(1);
+    }
     
     close(sock);
     return 0;
@@ -132,9 +169,13 @@ void *receiveData(void *arg) {
         int str_len = read(sock, msg, BUF_SIZE);
         if (str_len == -1) {
             error_handling("read() error");
+        } else if (str_len == 0) {
+            printf("서버 문제 발생, 종료합니다...\n");
+            exit(1);
         }
 
         msg[str_len] = '\0';
+
    
         int isNumber = 1;
         for (int i = 0; msg[i] < str_len; i++) {
@@ -167,7 +208,7 @@ void *receiveData(void *arg) {
                     close(sock);
                     exit(0);
                 } else if (number == -4) {
-                    printf("당신이 이겼습니다\n");
+                    printf("무승부입니다\n");
                     close(sock);
                     exit(0);
                 } else if (number == -5) {
@@ -180,7 +221,7 @@ void *receiveData(void *arg) {
                 int check = checkBingo();
                 printBingo();
 
-                if (check == 3) {
+                if (check >= 3) {
                     write(sock, "-1", sizeof("-1"));
                     turn = 99999;
                 } else {
