@@ -124,7 +124,6 @@ void * handle_clnt(void *arg){
     }
     unlock_mutex();
     
-    close(clnt_sock);
     clnt_cnt -= 1;
     if (clnt_cnt == 0) {
         clean_up();
@@ -197,7 +196,6 @@ int connect_client() {
 
     if (clnt_cnt == MAX_CLNT){
         send_num(clnt_sock, -5);
-        close(clnt_sock);
         return -1;
     }
     
@@ -236,7 +234,6 @@ void unlock_mutex() {
 
 void clean_up() {
     for (int i = 0; i < MAX_CLNT; i++) {
-        close(clnt_socks[i]);
     }
     close(serv_sock);
     pthread_mutex_destroy(&mutx);
