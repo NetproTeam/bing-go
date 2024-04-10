@@ -7,7 +7,6 @@
 #include <time.h>
 #include <pthread.h>
 #include <ctype.h>
-#include <errno.h>
 
 #define BUF_SIZE 1024
 #define BOARD_SIZE 5
@@ -77,32 +76,6 @@ int main(int argc, char *argv[]) {
     signal(SIGALRM, sigalarm_handler);
 
     alarm(HEARTBEAT_INTERVAL);
-
-    while (1) {
-        printf("enter\n");
-        if (!server_alive) {
-            printf("Server is not responding. Exiting...\n");
-            break;
-        }
-
-        ssize_t recv_size = recv(sock, msg, sizeof(msg), MSG_DONTWAIT);
-
-        if (recv_size == -1) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                continue;
-            } else {
-                error_handling("recv() error");
-            }
-        } else if (recv_size == 0) {
-            printf("서버 오류. 끝내기...\n");
-            break;
-        } else {
-            alarm(HEARTBEAT_INTERVAL);
-            server_alive = 1;
-        }
-
-        sleep(1);
-    }
     
     close(sock);
     return 0;
@@ -199,6 +172,7 @@ void *receiveData(void *arg) {
                 }
 
                 if (number == -2) {
+                    turn = 0;
                     printf("당신이 이겼습니다\n");
                     close(sock);
                     exit(0);
